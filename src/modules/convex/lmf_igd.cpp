@@ -13,6 +13,7 @@
 
 #include "task/lmf.hpp"
 #include "algo/igd.hpp"
+#include "algo/LMFIGD.hpp"
 #include "algo/loss.hpp"
 
 #include "type/tuple.hpp"
@@ -26,11 +27,15 @@ namespace modules {
 namespace convex {
 
 // This 2 classes contain public static methods that can be called
-typedef IGD<LMFIGDState<MutableArrayHandle<double> >, LMFIGDState<ArrayHandle<double> >,
-        LMF<LMFModel<MutableArrayHandle<double> >, LMFTuple > > LMFIGDAlgorithm;
+typedef LMFIGD<LMFIGDState<MutableArrayHandle<double> >,
+                LMFIGDState<ArrayHandle<double> >,
+                LMF<LMFModel<MutableArrayHandle<double> >,
+                        LMFTuple > > LMFIGDAlgorithm;
 
-typedef Loss<LMFIGDState<MutableArrayHandle<double> >, LMFIGDState<ArrayHandle<double> >,
-        LMF<LMFModel<MutableArrayHandle<double> >, LMFTuple > > LMFLossAlgorithm;
+typedef Loss<LMFIGDState<MutableArrayHandle<double> >,
+                LMFIGDState<ArrayHandle<double> >,
+                LMF<LMFModel<MutableArrayHandle<double> >,
+                        LMFTuple > > LMFLossAlgorithm;
 
 /**
  * @brief Perform the low-rank matrix factorization transition step
@@ -48,17 +53,18 @@ lmf_igd_transition::run(AnyType &args) {
     // initilize the state if first tuple
     if (state.algo.numRows == 0) {
         if (!args[4].isNull()) {
+            // previous state provided, possibly from previous iteration
             LMFIGDState<ArrayHandle<double> > previousState = args[4];
             state.allocate(*this, previousState.task.rowDim,
                     previousState.task.colDim, previousState.task.maxRank);
             state = previousState;
         } else {
             // configuration parameters
-            uint16_t rowDim = args[5].getAs<uint16_t>();
+            uint32_t rowDim = args[5].getAs<uint32_t>();
             if (rowDim == 0) {
                 throw std::runtime_error("Invalid parameter: row_dim = 0");
             }
-            uint16_t columnDim = args[6].getAs<uint16_t>();
+            uint32_t columnDim = args[6].getAs<uint32_t>();
             if (columnDim == 0) {
                 throw std::runtime_error("Invalid parameter: column_dim = 0");
             }
@@ -80,28 +86,46 @@ lmf_igd_transition::run(AnyType &args) {
             state.task.stepsize = stepsize;
             state.task.model.initialize(scaleFactor);
         }
-        // resetting in either case
+        // reset 'state' if starting
         state.reset();
     }
 
     // tuple
     LMFTuple tuple;
-    tuple.indVar.i = args[1].getAs<uint16_t>();
-    tuple.indVar.j = args[2].getAs<uint16_t>();
-    if (tuple.indVar.i == 0 || tuple.indVar.j == 0) {
-        throw std::runtime_error("Invalid parameter: [col_row] = 0 or "
-                "[col_column] = 0 in table [rel_source]");
+    tuple.indVar.i = args[1].getAs<uint32_t>();
+    tuple.indVar.j = args[2].getAs<uint32_t>();
+    if (tuple.indVar.i == 0){
+        throw std::runtime_error("Invalid parameter: [col_row] = 0"
+                " in table [rel_source]");
     }
+    if (tuple.indVar.j == 0){
+        throw std::runtime_error("Invalid parameter: [col_row] = 0"
+                " in table [rel_source]");
+    }
+
     // database starts from 1, while C++ starts from 0
     tuple.indVar.i --;
     tuple.indVar.j --;
     tuple.depVar = args[3].getAs<double>();
 
+    // DEBUG
+/*    RowVector u_elem = state.algo.incrModel.matrixU.row(tuple.indVar.i);
+    RowVector v_elem = state.algo.incrModel.matrixV.row(tuple.indVar.j);
+    double product_before = u_elem * trans(v_elem);
+*/
     // Now do the transition step
     LMFIGDAlgorithm::transition(state, tuple);
     LMFLossAlgorithm::transition(state, tuple);
     state.algo.numRows ++;
 
+    //DEBUG
+/*    u_elem = state.algo.incrModel.matrixU.row(tuple.indVar.i);
+    v_elem = state.algo.incrModel.matrixV.row(tuple.indVar.j);
+    double product_after = u_elem * trans(v_elem);
+    dberr << tuple.depVar << " (" << tuple.indVar.i + 1 << "," <<
+             tuple.indVar.j + 1 << ") -> " <<
+             product_before << " -:- " << product_after << std::endl;
+*/
     return state;
 }
 
@@ -123,8 +147,8 @@ lmf_igd_merge::run(AnyType &args) {
     LMFLossAlgorithm::merge(stateLeft, stateRight);
     // The following numRows update, cannot be put above, because the model
     // averaging depends on their original values
-    stateLeft.algo.numRows += stateRight.algo.numRows;
 
+    stateLeft.algo.numRows += stateRight.algo.numRows;
     return stateLeft;
 }
 
@@ -133,8 +157,8 @@ lmf_igd_merge::run(AnyType &args) {
  */
 AnyType
 lmf_igd_final::run(AnyType &args) {
-    // We request a mutable object. Depending on the backend, this might perform
-    // a deep copy.
+    // We request a mutable object. Depending on the backend, this might
+    // perform a deep copy.
     LMFIGDState<MutableArrayHandle<double> > state = args[0];
 
     // Aggregates that haven't seen any data just return Null.
@@ -147,7 +171,6 @@ lmf_igd_final::run(AnyType &args) {
 
     // for stepsize tuning
     dberr << "RMSE: " << state.task.RMSE << std::endl;
-
     return state;
 }
 

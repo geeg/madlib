@@ -17,9 +17,14 @@ namespace modules {
 
 namespace convex {
 
-struct MatrixIndex {
+struct SmallMatrixIndex { //For matrices limited by max_value(INT2)
     uint16_t i;
     uint16_t j;
+};
+
+struct MatrixIndex { //For matrices limited by max_value(INT4)
+    uint32_t i;
+    uint32_t j;
 };
 
 } // namespace convex

@@ -27,7 +27,7 @@ namespace convex {
  * object containing scalars and vectors.
  *
  * Note: We assume that the DOUBLE PRECISION array is initialized by the
- * database with length at least 8 (actually 9), and at least first 3 elemenets
+ * database with length at least 8 (actually 9), and at least first 3 elements
  * are 0 (exact values of other elements are ignored).
  *
  */
@@ -54,8 +54,8 @@ public:
     /**
      * @brief Allocating the incremental gradient state.
      */
-    inline void allocate(const Allocator &inAllocator, uint16_t inRowDim,
-            uint16_t inColDim, uint16_t inMaxRank) {
+    inline void allocate(const Allocator &inAllocator, uint32_t inRowDim,
+            uint32_t inColDim, uint16_t inMaxRank) {
         mStorage = inAllocator.allocateArray<double, dbal::AggregateContext,
                 dbal::DoZero, dbal::ThrowBadAlloc>(
                 arraySize(inRowDim, inColDim, inMaxRank));
@@ -67,7 +67,7 @@ public:
         task.rowDim = inRowDim;
         task.colDim = inColDim;
         task.maxRank = inMaxRank;
-        
+
         // This time all the member fields are correctly binded
         rebind();
     }
@@ -91,6 +91,13 @@ public:
         algo.numRows = 0;
         algo.loss = 0.;
         algo.incrModel = task.model;
+        // initialize updated_rows vector to 1 to ensure no 'divide-by-zero'
+        for (size_t i = 0; i < task.rowDim; i++){
+           algo.updated_U_rows[i] = 1;
+        }
+        for (size_t j = 0; j < task.colDim; j++){
+           algo.updated_V_rows[j] = 1;
+        }
     }
 
     /**
@@ -104,9 +111,19 @@ public:
         task.RMSE = sqrt(algo.loss / static_cast<double>(algo.numRows));
     }
 
-    static inline uint32_t arraySize(const uint16_t inRowDim, 
-            const uint16_t inColDim, const uint16_t inMaxRank) {
-        return 8 + 2 * LMFModel<Handle>::arraySize(inRowDim, inColDim, inMaxRank);
+    static inline uint32_t arraySize(const uint32_t inRowDim,
+            const uint32_t inColDim, const uint16_t inMaxRank) {
+      /*
+       *  Variables:    task -  rowDim, ColDim, maxRank,
+       *                        stepSize, initValue, RMSE
+       *                 algo -  numRows, loss, u_mutex_merges, v_mutex_merges
+       *  Two LMF models: task.model, algo.incrModel
+       *  Two vectors for counting updated rows of model :
+       *                  algo.updated_U_rows (inRowDim),
+       *                  algo.updated_V_rows (inColDim)
+      */
+      return 8 + inRowDim + inColDim +
+                2 * LMFModel<Handle>::arraySize(inRowDim, inColDim, inMaxRank);
     }
 
 private:
@@ -140,26 +157,26 @@ private:
                 task.colDim, task.maxRank);
         uint32_t modelLength = LMFModel<Handle>::arraySize(task.rowDim,
                 task.colDim, task.maxRank);
-//        task.model.rebind(&mStorage[5], task.rowDim,
-//                task.colDim, task.maxRank);
+    // task.model.rebind(&mStorage[5], task.rowDim, task.colDim, task.maxRank);
         task.RMSE.rebind(&mStorage[5 + modelLength]);
 
         algo.numRows.rebind(&mStorage[6 + modelLength]);
         algo.loss.rebind(&mStorage[7 + modelLength]);
-//        algo.incrModel.rebind(&mStorage[8 + modelLength], task.rowDim,
-//                task.colDim, task.maxRank);
+    // algo.incrModel.rebind(&mStorage[8 + modelLength], task.rowDim,task.colDim, task.maxRank);
         algo.incrModel.matrixU.rebind(&mStorage[8 + modelLength],
                 task.rowDim, task.maxRank);
         algo.incrModel.matrixV.rebind(&mStorage[8 + modelLength +
                 task.rowDim * task.maxRank], task.colDim, task.maxRank);
+        algo.updated_U_rows.rebind(&mStorage[8 + 2*modelLength], task.rowDim);
+        algo.updated_V_rows.rebind(&mStorage[8 + 2*modelLength + task.rowDim],
+                                        task.colDim);
     }
-
     Handle mStorage;
 
 public:
     struct TaskState {
-        typename HandleTraits<Handle>::ReferenceToUInt16 rowDim;
-        typename HandleTraits<Handle>::ReferenceToUInt16 colDim;
+        typename HandleTraits<Handle>::ReferenceToUInt32 rowDim;
+        typename HandleTraits<Handle>::ReferenceToUInt32 colDim;
         typename HandleTraits<Handle>::ReferenceToUInt16 maxRank;
         typename HandleTraits<Handle>::ReferenceToDouble stepsize;
         typename HandleTraits<Handle>::ReferenceToDouble initValue;
@@ -171,6 +188,11 @@ public:
         typename HandleTraits<Handle>::ReferenceToUInt64 numRows;
         typename HandleTraits<Handle>::ReferenceToDouble loss;
         LMFModel<Handle> incrModel;
+        // number of times a row of algo.model was updated in an iteration
+        typename HandleTraits<Handle>
+                    ::ColumnVectorTransparentHandleMap updated_U_rows;
+        typename HandleTraits<Handle>
+                    ::ColumnVectorTransparentHandleMap updated_V_rows;
     } algo;
 };
 

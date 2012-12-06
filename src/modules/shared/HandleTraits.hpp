@@ -19,7 +19,7 @@ namespace modules {
  * the composite type "inherit" their mutability from the array. To that end,
  * HandleTraits takes a Handle type as template argument and correspondingly
  * defines mutable or immutable reference types.
- * 
+ *
  * @note
  *     HandleTraits are used for strict type safety and const-correctness.
  *     Just using <tt>const_cast</tt> is arguably a bit shorter, but less

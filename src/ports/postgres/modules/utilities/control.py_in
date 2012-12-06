@@ -5,7 +5,7 @@
 
 @brief controller classes (e.g. iteration controller)
 
-@namespace utilities 
+@namespace utilities
 
 @brief driver functions shared by modules
 """
@@ -44,9 +44,9 @@ class IterationController:
 
     ***all only "template" parameters are passes as PL/Python arguments***,
 
-    whereas non-template arguments are provided in an argument table. Here, 
-    "template" arguments are those parameters that cannot be SQL parameters, 
-    
+    whereas non-template arguments are provided in an argument table. Here,
+    "template" arguments are those parameters that cannot be SQL parameters,
+
     ***such as table and column names***.
 
     The inter-state iteration table contains two columns:

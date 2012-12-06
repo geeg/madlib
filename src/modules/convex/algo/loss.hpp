@@ -1,4 +1,4 @@
-/* ----------------------------------------------------------------------- *//** 
+/* ----------------------------------------------------------------------- *//**
  *
  * @file loss.hpp
  *
@@ -40,7 +40,7 @@ Loss<State, ConstState, Task>::transition(state_type &state,
     // "task.model" NOT "algo.incrModel"! Also see: igd.hpp:final()
 
     state.algo.loss += Task::loss(
-            state.task.model, 
+            state.task.model,
             tuple.indVar,
             tuple.depVar);
 }
