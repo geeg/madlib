@@ -190,9 +190,12 @@ include(OSXUtils)
 
 
 # -- Include all parts ---------------------------------------------------------
+file(WRITE ${CMAKE_BINARY_DIR}/ctest_tests.sh "#!/usr/bin/env bash\n") 
+configure_file(${CMAKE_SOURCE_DIR}/cmake/CTestCustom.cmake
+        ${CMAKE_BINARY_DIR}/CTestCustom.cmake)
 
 # -- Add subdirectories --------------------------------------------------------
-
+enable_testing()
 add_subdirectory(src)
 add_subdirectory(doc)
 add_subdirectory(deploy)

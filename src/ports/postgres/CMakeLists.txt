@@ -53,6 +53,10 @@ list(APPEND MAD_DBAL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/dbconnector/UDF_impl.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/dbconnector/UDF_proto.hpp"
 )
+set(MAD_TEST_DBAL_SOURCES
+    ${MAD_DBAL_SOURCES})
+list(REMOVE_ITEM MAD_TEST_DBAL_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/dbconnector/NewDelete.cpp")
 
 # FIXME: Convert legacy source code written in C
 # BEGIN Legacy Code
@@ -63,6 +67,11 @@ list(APPEND MAD_DBAL_SOURCES
 
 # END Legacy Code
 
+# Unit test sources
+file(GLOB_RECURSE UNIT_TEST_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/tests/*.cpp")
+list(REMOVE_ITEM UNIT_TEST_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/tests/runtest.cpp")
 
 # -- 2. Copy all SQL files. Since SQL files contain file names, they are only
 #       preprocessed at installation time, i.e., by madpack. -------------------
@@ -135,6 +144,11 @@ function(add_${PORT_LC}_library IN_PORT_VERSION)
         lib
         "${${DBMS_UC}_EXECUTABLE}"
         ${MAD_DBAL_SOURCES}
+    )
+
+    add_madlib_shared_library(madlib_test_${DBMS}
+        lib
+        ${MAD_TEST_DBAL_SOURCES}
     )
 
     # FIXME: Convert legacy source code written in C
@@ -225,8 +239,62 @@ function(add_${PORT_LC}_library IN_PORT_VERSION)
         DESTINATION ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/madpack
         COMPONENT ${DBMS}
     )
+
+    add_unit_tests(madlib_test_${DBMS})
 endfunction(add_${PORT_LC}_library)
 
+function(add_unit_tests MADLIB_LIB)
+    find_package (Boost 1.46 COMPONENTS unit_test_framework)    
+    if(Boost_FOUND)
+        link_directories(
+    		${Boost_LIBRARY_DIRS}
+		"${CMAKE_SOURCE_DIR}/src/dbal"
+        	"${CMAKE_BINARY_DIR}/src/ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/lib")
+        include_directories(
+        	 ${Boost_INCLUDE_DIR}
+	        "${${DBMS_UC}_SERVER_INCLUDE_DIR}"
+       	 	"${MAD_THIRD_PARTY}/src/EP_boost"
+        	"${CMAKE_SOURCE_DIR}/src"
+        	"${CMAKE_SOURCE_DIR}/src/ports/${PORT_DIR_NAME}"
+        	"${MAD_THIRD_PARTY}/src/EP_eigen"
+        	"${CMAKE_SOURCE_DIR}/src/dbal"
+        	"${CMAKE_BINARY_DIR}/src/ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/lib")
+        set(PORT_ID "Postgres_${IN_PORT_VERSION}")
+        set(EXE_NAME
+		"UnitTests-${PORT_ID}")
+        configure_file(
+        	${CMAKE_SOURCE_DIR}/src/tests/runtest.cpp
+        	${CMAKE_BINARY_DIR}/src/ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/runtest.cpp
+		@only
+        )
+        add_executable(${EXE_NAME}
+        	#"${CMAKE_SOURCE_DIR}/src/tests/runtest.cpp"
+        	${CMAKE_BINARY_DIR}/src/ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/runtest.cpp
+		${UNIT_TEST_SOURCES}
+    	)
+        # Make top-level target depend on other top-level targets
+        add_dependencies(${EXE_NAME} 
+		${Boost_LIBRARIES} 
+		${MADLIB_LIB})
+        TARGET_LINK_LIBRARIES(${EXE_NAME}
+		${CMAKE_SOURCE_DIR}/src/dbal/libpg_sim.so
+        	${CMAKE_BINARY_DIR}/src/ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/lib/libmadlibtest.so
+        	${Boost_LIBRARIES}
+    	)
+    	add_test(
+        	NAME ${EXE_NAME}
+        	COMMAND ${EXE_NAME}
+        	--catch_system_error=yes
+        	--output_format=XML
+        	--log_level=all
+        	#--show_progress=yes
+    	)
+    	file(APPEND ${CMAKE_BINARY_DIR}/ctest_tests.sh
+		"./src/ports/${PORT_DIR_NAME}/${IN_PORT_VERSION}/${EXE_NAME} --output_format=XML --log_level=all >> ${CMAKE_BINARY_DIR}/${EXE_NAME}-results.xml 2>&1\n")
+    else(Boost_FOUND)
+        message(STATUS ">> Unit Tests will NOT be generated since no sufficient version (>=1.46) of the Boost unit test library was found.")
+    endif(Boost_FOUND)
+endfunction(add_unit_tests)
 
 # -- 5. Provide a macro to be called from CMakeLists.txt in the version
 #       directory. We want these files to be one-liners. -----------------------

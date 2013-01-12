@@ -102,7 +102,7 @@ set(MAD_MODULE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/modules)
 
 
 # -- Third-party dependencies: Find or download Boost --------------------------
-
+set(Boost_THIRD_PARTY FALSE)
 find_package(Boost 1.46)
 
 # We use BOOST_ASSERT_MSG, which only exists in Boost 1.46 and later.
@@ -118,7 +118,6 @@ if(Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
 else(Boost_FOUND)
     message(STATUS "No sufficiently recent version (>= 1.46) of Boost was found. Will download.")
-
     ExternalProject_Add(EP_boost
         PREFIX ${MAD_THIRD_PARTY}
         DOWNLOAD_DIR ${MAD_THIRD_PARTY}/downloads
@@ -129,6 +128,7 @@ else(Boost_FOUND)
         INSTALL_COMMAND /usr/bin/env echo Ignored: make
         BINARY_DIR ${MAD_THIRD_PARTY}/src/EP_boost
     )
+    set(Boost_THIRD_PARTY TRUE)
     include_directories(BEFORE SYSTEM ${MAD_THIRD_PARTY}/src/EP_boost)
 endif(Boost_FOUND)
 
@@ -238,6 +238,21 @@ macro(add_madlib_connector_library IN_TARGET_NAME IN_LIB_DIR IN_LIB_LOADER)
     endif(APPLE)
 endmacro(add_madlib_connector_library)
 
+macro(add_madlib_shared_library IN_TARGET_NAME IN_LIB_DIR)
+    set(IN_LIBRARY_SOURCES ${ARGN})
+
+    add_library(
+        ${IN_TARGET_NAME}
+        SHARED
+        ${IN_LIBRARY_SOURCES}
+    )
+    add_dependencies(${IN_TARGET_NAME} EP_eigen)
+    set_target_properties(${IN_TARGET_NAME} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${IN_LIB_DIR}"
+        OUTPUT_NAME "madlibtest"
+        BUILD_WITH_INSTALL_RPATH YES
+    )
+endmacro(add_madlib_shared_library)
 
 # -- Speciy files that will be compiled into MADlib core library ---------------
 
