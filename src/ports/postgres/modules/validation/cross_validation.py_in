@@ -94,25 +94,25 @@ def __cv_combine_params_type_general(params, params_type, tbl_data,
         if params[i] is None:
             rst += "NULL"
         elif params[i] not in opts:
-            rst += "\'" + params[i] + "\'::" + params_type[i]
+            rst += "\'" + params[i] + "\'::" + params_type[i].replace('"', '')
         elif params[i] == param_explored:
-            rst += "\'" + explore_value + "\'::" + params_type[i]
+            rst += "\'" + explore_value + "\'::" + params_type[i].replace('"', '')
         elif params[i] == "%data%":
-            rst += "\'" + tbl_data + "\'::" + params_type[i]
+            rst += "\'" + tbl_data + "\'::" + params_type[i].replace('"', '')
         elif params[i] == "%id%":
-            rst += "\'" + col_random_id + "\'::" + params_type[i]
+            rst += "\'" + col_random_id + "\'::" + params_type[i].replace('"', '')
         elif params[i] == "%error%" :
-            rst += "\'" + tbl_output + "\'::" + params_type[i]
+            rst += "\'" + tbl_output + "\'::" + params_type[i].replace('"', '')
         elif params[i] == "%model%":
             if tbl_input is None:
-                rst += "\'" + tbl_output + "\'::" + params_type[i]
+                rst += "\'" + tbl_output + "\'::" + params_type[i].replace('"', '')
             else:
-                rst += "\'" + tbl_input + "\'::" + params_type[i]
+                rst += "\'" + tbl_input + "\'::" + params_type[i].replace('"', '')
         elif params[i] == "%prediction%":
             if "%error%" in set(params):
-                rst += "\'" + tbl_input + "\'::" + params_type[i]
+                rst += "\'" + tbl_input + "\'::" + params_type[i].replace('"', '')
             else:
-                rst += "\'" + tbl_output + "\'::" + params_type[i]
+                rst += "\'" + tbl_output + "\'::" + params_type[i].replace('"', '')
 
         if i != len(params) - 1:
             rst = rst + ", "
